@@ -1,81 +1,132 @@
-####Read Data------------
-library(ggplot2)
-library(car)
-library(plotly)
-library(gridExtra)
-library(dplyr)
+# ICS Project - 3
+# Author - Kunal Kochar
+# Group Members:
+# 1. Ashish Saini
+# 2. Dhanunjaya Elluri Thimmaraju
+# 3. Harshini Eggoni
+# 4. Kunal Kochar
+# 5. Naveen Kumar Bhageradhi
+# 6. Supritha Palguna
 
-##Version of R------
+
+library(xtable)
+#Version of R------
 R.version.string
+#Read Data
+df <- read.csv("vw_data.csv", header = TRUE)
+df <- subset(df, select = -c(X))
 
-df <- read.csv("./ImmoDataNRW.csv", header = TRUE, sep = ",")
-
+# Check for dimensions
 dim (df)
 
-##Data Prep##-----
-n_distinct(df$regio2)
-df_dort <-df[df$regio2 =="Dortmund",]
-df_dort$sqmPrice <- df_dort$totalRent/df_dort$livingSpace
+# Number of cars per each model
+table(df$model)
+# Number of cars per each fueltype
+table(df$fuelType)
+# Number of cars per each transmission type
+table(df$transmission)
 
-df_dort$groupOfFlat[df_dort$typeOfFlat %in% c("apartment")] <- "apartment"
-df_dort$groupOfFlat[df_dort$typeOfFlat %in% c("loft", "maisonette", "penthouse", "terraced_flat", "other")] <- "luxurious_artistic_other"
-df_dort$groupOfFlat[df_dort$typeOfFlat %in% c("ground_floor", "raised_ground_floor")] <- "r_ground_floor"
-df_dort$groupOfFlat[df_dort$typeOfFlat %in% c("roof_storey", "half_basement")] <- "roof_half_basement"
+# Check for null values
+is.null(df)
 
-dim (df_dort)
 
-##Removing Missing values##----
-countNa <- data.frame(sapply(df_dort, function(y) {
-  sum(length(which(is.na(y))))
-}))
+###########################################################
+# Task - 1
+# litre per 100kms 
+df$lp100=282.48/(df$mpg)
+#Removing mpg column
+df$mpg <- NULL
+###########################################################
+# Task - 2
+# Car's age
+df$age = 2020 -(df$year)
+# Removing year column
+df$year <- NULL
 
-print(countNa)
-
-##We see variable 'noParkSpaces' has maximum number of NA values, so deleting them. Also the independent variable which are dependent on some other independent variables are deleted here ------
-df_dort$noParkSpaces <- NULL
-df_dort$ID <- NULL
-df_dort$typeOfFlat <- NULL
-df_dort$totalRent <- NULL
-df_dort$livingSpace <- NULL
-df_dort$regio2 <- NULL
-
-##Deleting the rows with at least one missing values
-df_final <- df_dort[complete.cases(df_dort),]
-
-dim (df_final)
-
-####Descriptive Statistics------------
-#Sample size
-table(df_final$groupOfFlat)
-
+#log of car price
+df$logprice=log(df$price)
 #Data Type
-str(df_final)
+str(df)
 
-#Data summary
+#Descriptive Statistics
+summary(df$price)
+summary(df$logprice)
+summary(df$mileage)
+summary(df$age)
+summary(df$lp100)
+summary(df$tax)
+summary(df$engineSize)
+
+# Summary of each Model
+table(df$model)
 df_s <- data.frame()
-for (i in unique(df_final$groupOfFlat)){
+for (i in unique(df$model)){
   
-  df_s <- rbind(df_s,summary(df_final$sqmPrice[df_final$groupOfFlat == i]))
+  df_s <- rbind(df_s,summary(df$price[df$model == i]))
   
 }
 colnames(df_s) <- c("Min","Q1","Median","Mean","Q3","Max")
 df_s
+#FuelType
+table(df$fuelType)
+df_t <- data.frame()
+for (i in unique(df$fuelType)){
+  
+  df_t <- rbind(df_t,summary(df$price[df$fuelType == i]))
+  
+}
+colnames(df_t) <- c("Min","Q1","Median","Mean","Q3","Max")
+df_t
+#Transmission
+df_u <- data.frame()
+for (i in unique(df$transmission)){
+  
+  df_u <- rbind(df_u,summary(df$price[df$transmission == i]))
+  
+}
+colnames(df_u) <- c("Min","Q1","Median","Mean","Q3","Max")
+df_u
 
+
+
+
+###########################################################
+#Task - 3
+
+#using price as response variable
+fit_1 = lm(price ~ model+mileage+fuelType+engineSize+tax+transmission+lp100+age, data = df)
+residuals <- df$price - fit_1$fitted.values
+plot(fit_1$fitted.values, residuals, main = "Residuals Plot",xlab=("Fitted values"), ylab=("Residuals"))
+abline(0,0)
+qqnorm(residuals, xlab=("Quantiles"), ylab=("Residuals"))
+qqline(residuals)
+
+
+#using log price as response variable
+fit_2 = lm(logprice ~ model+mileage+fuelType+engineSize+tax+transmission+lp100+age, data = df)
+residuals <- df$logprice - fit_2$fitted.values
+plot(fit_2$fitted.values, residuals, main = "Residuals Plot",xlab=("Fitted values"), ylab=("Residuals"))
+abline(0,0)
+qqnorm(residuals, xlab=("Quantiles"), ylab=("Residuals"))
+qqline(residuals)
+
+# Checking multi-collinearity
+library(car)
+vif(fit_2)
 
 ##variables to be as.factor##----
-df_final$newlyConst <- as.factor(df_final$newlyConst)
-df_final$balcony <- as.factor(df_final$balcony)
-df_final$hasKitchen <- as.factor(df_final$hasKitchen)
-df_final$lift <- as.factor(df_final$lift)
-df_final$garden <- as.factor(df_final$garden)
-df_final$condition <- as.factor(df_final$condition)
-df_final$lastRefurbish <- as.factor(df_final$lastRefurbish)
-df_final$energyEfficiencyClass <- as.factor(df_final$energyEfficiencyClass)
-df_final$groupOfFlat <- as.factor(df_final$groupOfFlat)
+df$model <- as.factor(df$model)
+df$fuelType <- as.factor(df$fuelType)
+df$transmission <- as.factor(df$transmission)
 
-##AIC BIC Computation##----
+#removing price, mpg
+df$price <- NULL
 
-predictors <- as.data.frame(colnames(df_final[-11]))
+
+##AIC Computation##----
+
+
+predictors <- as.data.frame(colnames(df[-9]))
 colnames(predictors) <- "regressor"
 SubSetResult <- vector()
 
@@ -95,64 +146,43 @@ for (predictorsCounter in 1:nrow(predictors)) {
       
     }
     
-    formula <- paste("sqmPrice ~",sub(".","",betaFormula))
+    formula <- paste("logprice ~",sub(".","",betaFormula))
     
-    reg.lm <- lm(as.formula(formula), df_final)
+    reg.lm <- lm(as.formula(formula), df)
+    
     
     aic <- AIC(reg.lm)
     
-    bic <- BIC(reg.lm)
-    
-    SubSetResult <- rbind(SubSetResult,c(formula,round(aic, digits = 2),round(bic, digits = 2), predictorsCounter))
+    SubSetResult <- rbind(SubSetResult,c(formula,round(aic, digits = 2), predictorsCounter))
     
   }
-  
 }
 
 SubSetResult <- as.data.frame(SubSetResult)
 
-colnames(SubSetResult) <- c("model","aic","bic","CountOfPredictors")
+colnames(SubSetResult) <- c("model","aic","CountOfPredictors")
 aicmin <- which.min(SubSetResult$aic)
-bicmin <- which.min(SubSetResult$bic)
 
 
 print(SubSetResult[aicmin,])
-print(SubSetResult[bicmin,])
 
-##BestLinearModelestimation----
 
-aic.mdl <- lm(formula = sqmPrice ~ newlyConst+balcony+yearConstructed+hasKitchen+lift+floor+condition+energyEfficiencyClass+groupOfFlat, data = df_final)
-summary(aic.mdl)
-
-bic.mdl <- lm(formula = sqmPrice ~ newlyConst+hasKitchen+lift+condition, data = df_final)
-summary(bic.mdl)
-##par(mfrow = c(2,2))
-##plot(aic.mdl)
-##plot.new()
-
+###########################################################
+# Task - 4
+library(xtable)
+mdl <- lm(formula =logprice ~ model+transmission+mileage+fuelType+tax+engineSize+lp100+age , data = df)
+summary(mdl)
+print(xtable(summary(mdl), type = "latex"), file = "sum_model1.tex")
 ##Residual vs Fitted value Plot----
-residuals <- df_final$sqmPrice - aic.mdl$fitted.values
-plot(aic.mdl$fitted.values, residuals, main = "Residuals Plot",xlab=("Fitted values"), ylab=("Residuals"))
+residuals <- df$logprice - mdl$fitted.values
+plot(mdl$fitted.values, residuals, main = "Residuals Plot",xlab=("Fitted values"), ylab=("Residuals"))
 abline(0,0)
 
 ##QQ Plot for Normality Assumption----
 
-qqnorm(residuals, xlab=("Quantiles AIC Model"), ylab=("Residuals"))
+qqnorm(residuals, xlab=("Quantiles"), ylab=("Residuals"))
 qqline(residuals)
 
-
 ##ConfidenceInterval----
-confint(aic.mdl, level = 0.95)
-##Graph##----
-##ggplot(df_final, aes(y=sqmPrice, x= aic.mdl$fitted.values))+
-  ##geom_point() + ylab("True values") + xlab("Fitted Values")+
-  ##theme(plot.title = element_text( 
-    ##size = 20, hjust = 0.5), face = "bold", text= element_text(size=20))+
-  ##geom_abline(intercept=0, slope=1)
-
-
-
-
-##confint(bic.mdl)
-##mod <- lm(sqmPrice~., data = df_final)
-##summary(mod)
+confint(mdl, level = 0.95)
+print(xtable(confint(mdl, level = 0.95), type = "latex"), file = "sum_model2.tex")
